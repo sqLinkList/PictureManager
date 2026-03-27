@@ -3,9 +3,12 @@ package com.yupi.yupicturebackend.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yupi.yupicturebackend.api.hunyuan.HunyuanImageAnalysis;
+import com.yupi.yupicturebackend.api.hunyuan.model.ImageAnalysisResult;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
 import com.yupi.yupicturebackend.manager.FileManager;
@@ -19,12 +22,14 @@ import com.yupi.yupicturebackend.model.vo.UserVO;
 import com.yupi.yupicturebackend.service.PictureService;
 import com.yupi.yupicturebackend.mapper.PictureMapper;
 import com.yupi.yupicturebackend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +41,7 @@ import java.util.stream.Collectors;
 * @description 针对表【picture(图片)】的数据库操作Service实现
 * @createDate 2026-03-11 08:53:41
 */
+@Slf4j
 @Service
 public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     implements PictureService{
@@ -45,6 +51,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private HunyuanImageAnalysis hunyuanImageAnalysis;
 
 //    @Override
 //    public void validPicture(Picture picture) {
@@ -104,6 +113,23 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         picture.setPicScale(uploadPictureResult.getPicScale());
         picture.setPicFormat(uploadPictureResult.getPicFormat());
         picture.setUserId(loginUser.getId());
+        // 调用混元大模型自动生成简介、标签、分类
+        try {
+            ImageAnalysisResult analysisResult = hunyuanImageAnalysis.analyzeImage(uploadPictureResult.getUrl());
+            picture.setIntroduction(analysisResult.getDescription());
+            // AI 返回的 tags 是逗号分隔字符串，需转为 JSON 数组格式存储
+            String rawTags = analysisResult.getTags();
+            if (rawTags != null && !rawTags.trim().isEmpty()) {
+                List<String> tagList = Arrays.stream(rawTags.split("[，,]"))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList());
+                picture.setTags(JSONUtil.toJsonStr(tagList));
+            }
+            picture.setCategory(analysisResult.getCategory());
+        } catch (Exception e) {
+            log.warn("AI图片分析失败，跳过自动填充: {}", e.getMessage());
+        }
         // 如果 pictureId 不为空，表示更新，否则是新增
         if (pictureId != null) {
             // 如果是更新，需要补充 id 和编辑时间

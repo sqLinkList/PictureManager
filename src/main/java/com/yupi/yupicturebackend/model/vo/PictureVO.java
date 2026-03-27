@@ -6,8 +6,11 @@ import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 import java.io.Serializable;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Data
 public class PictureVO implements Serializable {
@@ -118,7 +121,18 @@ public class PictureVO implements Serializable {
         PictureVO pictureVO = new PictureVO();  
         BeanUtils.copyProperties(picture, pictureVO);  
         // 类型不同，需要转换  
-        pictureVO.setTags(JSONUtil.toList(picture.getTags(), String.class));  
+        // 兼容 JSON 数组格式和逗号分隔字符串两种存储格式
+        String tags = picture.getTags();
+        if (tags == null || tags.trim().isEmpty()) {
+            pictureVO.setTags(Collections.emptyList());
+        } else if (tags.trim().startsWith("[")) {
+            pictureVO.setTags(JSONUtil.toList(tags, String.class));
+        } else {
+            pictureVO.setTags(Arrays.stream(tags.split("[，,]"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toList()));
+        }  
         return pictureVO;  
     }  
 }

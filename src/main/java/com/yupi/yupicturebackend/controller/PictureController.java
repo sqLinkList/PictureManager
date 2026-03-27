@@ -10,6 +10,8 @@ import com.yupi.yupicturebackend.constant.UserConstant;
 import com.yupi.yupicturebackend.exception.BusinessException;
 import com.yupi.yupicturebackend.exception.ErrorCode;
 import com.yupi.yupicturebackend.exception.ThrowUtils;
+import com.yupi.yupicturebackend.api.hunyuan.HunyuanImageAnalysis;
+import com.yupi.yupicturebackend.api.hunyuan.model.ImageAnalysisResult;
 import com.yupi.yupicturebackend.model.dto.picture.PictureEditRequest;
 import com.yupi.yupicturebackend.model.dto.picture.PictureQueryRequest;
 import com.yupi.yupicturebackend.model.dto.picture.PictureUpdateRequest;
@@ -40,6 +42,9 @@ public class PictureController {
 
     @Resource
     private PictureService pictureService;
+
+    @Resource
+    private HunyuanImageAnalysis hunyuanImageAnalysis;
 
     /**
      * 上传图片（可重新上传）
@@ -192,6 +197,22 @@ public class PictureController {
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
+    }
+
+    /**
+     * AI 分析图片（根据图片 id 重新分析标签、分类、简介）
+     */
+    @PostMapping("/analyze")
+    public BaseResponse<ImageAnalysisResult> analyzePicture(@RequestBody java.util.Map<String, Object> body,
+                                                            HttpServletRequest request) {
+        userService.getLoginUser(request);
+        Object idObj = body.get("id");
+        ThrowUtils.throwIf(idObj == null, ErrorCode.PARAMS_ERROR, "id 不能为空");
+        long id = Long.parseLong(idObj.toString());
+        Picture picture = pictureService.getById(id);
+        ThrowUtils.throwIf(picture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
+        ImageAnalysisResult result = hunyuanImageAnalysis.analyzeImage(picture.getUrl());
+        return ResultUtils.success(result);
     }
 
     @GetMapping("/tag_category")
