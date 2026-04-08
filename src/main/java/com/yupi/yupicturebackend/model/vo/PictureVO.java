@@ -2,6 +2,7 @@ package com.yupi.yupicturebackend.model.vo;
 
 import cn.hutool.json.JSONUtil;
 import com.yupi.yupicturebackend.model.entity.Picture;
+import com.yupi.yupicturebackend.model.enums.PictureReviewStatusEnum;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
@@ -88,28 +89,25 @@ public class PictureVO implements Serializable {
     /**  
      * 更新时间  
      */  
-    private Date updateTime;  
-  
-    /**  
-     * 创建用户信息  
-     */  
-    private UserVO user;  
-  
+    private Date updateTime;
+
+    /**
+     * 创建用户信息
+     */
+    private UserVO user;
+
+    /**
+     * 审核状态：0-待审核; 1-通过; 2-拒绝
+     */
+    private Integer reviewStatus;
+
+    /**
+     * 审核状态文本
+     */
+    private String reviewStatusText;
+
     private static final long serialVersionUID = 1L;  
-  
-    /**  
-     * 封装类转对象  
-     */  
-    public static Picture voToObj(PictureVO pictureVO) {  
-        if (pictureVO == null) {  
-            return null;  
-        }  
-        Picture picture = new Picture();
-        BeanUtils.copyProperties(pictureVO, picture);
-        // 类型不同，需要转换  
-        picture.setTags(JSONUtil.toJsonStr(pictureVO.getTags()));
-        return picture;  
-    }  
+
   
     /**  
      * 对象转封装类  
@@ -117,10 +115,18 @@ public class PictureVO implements Serializable {
     public static PictureVO objToVo(Picture picture) {  
         if (picture == null) {  
             return null;  
-        }  
-        PictureVO pictureVO = new PictureVO();  
-        BeanUtils.copyProperties(picture, pictureVO);  
-        // 类型不同，需要转换  
+        }
+        PictureVO pictureVO = new PictureVO();
+        BeanUtils.copyProperties(picture, pictureVO);
+        // 设置审核状态文本
+        Integer reviewStatus = picture.getReviewStatus();
+        if (reviewStatus != null) {
+            PictureReviewStatusEnum statusEnum = PictureReviewStatusEnum.getEnumByValue(reviewStatus);
+            if (statusEnum != null) {
+                pictureVO.setReviewStatusText(statusEnum.getText());
+            }
+        }
+        // 类型不同，需要转换
         // 兼容 JSON 数组格式和逗号分隔字符串两种存储格式
         String tags = picture.getTags();
         if (tags == null || tags.trim().isEmpty()) {
